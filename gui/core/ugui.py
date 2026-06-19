@@ -300,11 +300,16 @@ class Display(DisplayIP):
             assert ev and touch is False and decr is None and prev is not None, "Invalid args"
             ipdev = InputEnc(nxt, sel, prev, encoder)
         else:
-            if touch:
+            if isinstance(touch, int):
                 from gui.primitives import ESP32Touch
 
                 ESP32Touch.threshold(touch)
                 ipdev = Input(nxt, sel, prev, incr, decr, encoder, ESP32Touch)
+            elif isinstance(touch, tuple):
+                from gui.primitives import RP2Touch
+
+                RP2Touch.config(*touch)
+                ipdev = Input(nxt, sel, prev, incr, decr, encoder, RP2Touch)
             else:  # If non-Pin arg is passed, assume 5 Pushbutton-compatible objects
                 btn = Pushbutton if isinstance(nxt, Pin) else lambda x, **y: x
                 ipdev = Input(nxt, sel, prev, incr, decr, encoder, btn)

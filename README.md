@@ -52,16 +52,18 @@ network-connected board with a 135x240 color display can be built for under £20
 test board shown above has a 320x240 display from eBay with a Pi Pico and has a
 component cost of well below £20.
 
-The following are similar GUI repos with differing objectives.
+The following are similar scalable GUI repos with differing objectives.
  * [nano-gui](https://github.com/peterhinch/micropython-nano-gui) Extremely low
  RAM usage but display-only with no provision for input.
- * [LCD160cr](https://github.com/peterhinch/micropython-lcd160cr-gui) Touch GUI
- for the official display.
- * [RA8875](https://github.com/peterhinch/micropython_ra8875) Touch GUI for
+ * [micropython-touch](https://github.com/peterhinch/micropython-touch) Touch GUI
+ for various displays and touch controllers.
+  * [RA8875](https://github.com/peterhinch/micropython_ra8875) Touch GUI for
  displays with RA8875 controller. Supports large displays, e.g. from Adafruit.
  * [SSD1963](https://github.com/peterhinch/micropython-tft-gui) Touch GUI for
  displays based on SSD1963 and XPT2046. High performance on large displays due
  to the parallel interface. Specific to STM hosts.
+ * [LCD160cr](https://github.com/peterhinch/micropython-lcd160cr-gui) Touch GUI
+ for the official display (appears to be obsolete).
 
 [LVGL](https://lvgl.io/) is a pretty icon-based GUI library. It is written in C
 with MicroPython bindings; consequently it requires the build system for your
@@ -69,6 +71,7 @@ target and a C device driver (unless you can acquire a suitable binary).
 
 # Project status
 
+Jun 2026: Supports touchpads on RP2 and ESP32.
 Dec 2025: GUI can optionally be started from a running asyncio task.
 Oct 2024: Refresh locking can now be handled by device driver.  
 Sept 2024: Refresh control is now via a `Lock`. See [Realtime applications](./README.md#9-realtime-applications).
@@ -159,9 +162,10 @@ under development so check for updates.
  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.3.1 [Class Curve](./README.md#731-class-curve)  
  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7.3.2 [Class PolarCurve](./README.md#732-class-polarcurve)  
  7.4 [Class TSequence](./README.md#74-class-tsequence) Plotting realtime, time sequential data.  
-8. [ESP32 touch pads](./README.md#8-esp32-touch-pads) Replacing buttons with touch pads.  
+8. [ESP32 touch pads](./README.md#8-esp32-touch-pads) Replacing buttons with touch pads on ESP32.  
 9. [Realtime applications](./README.md#9-realtime-applications) Accommodating tasks requiring fast RT performance.  
 10. [ePaper displays](./README.md#10-epaper-displays) Guidance on using ePaper displays.  
+11. [RP2 touch pads](./README.md#11-rp2-touch-pads) Replacing buttons with touch pads on RP2.
 
 [Appendix 1 Application design](./README.md#appendix-1-application-design) Tab order, button layout, encoder interface, use of graphics primitives, more on callbacks.  
 [Appendix 2 Freezing bytecode](./README.md#appendix-2-freezing-bytecode) Optional way to save RAM.  
@@ -636,11 +640,16 @@ files in `gui/core` are:
  * `ugui.py` The main GUI code.
  * `writer.py` Supports the `Writer` and `CWriter` classes.
 
-The `gui/primitives` directory contains the following files:  
+The `gui/primitives` directory contains the following files. Necessary files:  
  * `pushbutton.py` Interface to physical pushbuttons and ESP32 touch pads.
  * `delay_ms.py` A software triggerable timer.
+ Optional files for alternative input devices:
  * `encoder.py` Driver for a quadrature encoder. This offers an alternative
  interface - see [Appendix 1](./README.md#appendix-1-application-design).
+ * `esp32_touch.py` Supports touchpads on ESP32.
+ * `rp2_touch.py` Supports touchpads on RP2 (e.g. Pico and Pico 2).
+ * `virt_button.py` Supports exotic interfaces such as speech (via user hardware
+ and code).
 
 The `gui/demos` directory contains a variety of demos and tests described
 below.
@@ -3239,8 +3248,8 @@ The `touch` value determines the level from `machine.TouchPad.read()` at which
 a touch is determined to have occurred. In the above fragment a value of 80 is
 passed. Assume the untouched value from `TouchPad.read()` is 1020. If a value
 below 80% of 1020 = 816 is read, a touch is deemed to have occurred. Further
-docs on `pushbutton.py` may be found
-[here](https://github.com/peterhinch/micropython-async/blob/master/v3/docs/DRIVERS.md#42-esp32touch-class).
+docs on `esp32_touch.py` may be found
+[here](https://github.com/peterhinch/micropython-async/blob/master/v3/docs/DRIVERS.md#423-esp32touch-class).
 
 # 9. Realtime applications
 
@@ -3369,6 +3378,54 @@ greying-out has no visible effect. Greyed-out controls cannot accept the focus
 and are therefore disabled but appearance is unchanged. `nano-gui` has a 2-bit
 driver which supports greyscales, but there is no partial support so this is
 unsuitable for `micro_gui`.
+
+###### [Contents](./README.md#0-contents)
+
+# 11. RP2 touch pads
+
+On RP2040 physical buttons may be replaced with touch pads. Buttons and pads
+cannot be mixed, but it is possible to use three pads with an encoder.
+
+The only change required to use touch pads is in `hardware_setup.py`. Any pins
+may be used; each `Pin` mst be defined as an input with a pull down. The
+following illustrates a setup file for an application with five touchpads:
+```python
+from machine import Pin, SPI, freq
+import gc
+
+from drivers.ili93xx.ili9341 import ILI9341 as SSD
+
+freq(250_000_000)  # RP2 overclock
+# Create and export an SSD instance
+prst = Pin(9, Pin.OUT, value=1)
+pcs = Pin(10, Pin.OUT, value=1)
+pdc = Pin(8, Pin.OUT, value=0)  # Arbitrary pins
+spi = SPI(0, sck=Pin(6), mosi=Pin(7), miso=Pin(4), baudrate=30_000_000)
+gc.collect()  # Precaution before instantiating framebuf
+ssd = SSD(spi, pcs, pdc, prst, usd=True)
+gc.collect()
+from gui.core.ugui import Display, quiet
+
+# quiet()
+# Create and export a Display instance
+# Define control buttons
+nxt = Pin(27, Pin.IN, Pin.PULL_DOWN)  # Move to next control
+sel = Pin(17, Pin.IN, Pin.PULL_DOWN)  # Operate current control
+prev = Pin(26, Pin.IN, Pin.PULL_DOWN)  # Move to previous control
+increase = Pin(28, Pin.IN, Pin.PULL_DOWN)  # Increase control's value
+decrease = Pin(16, Pin.IN, Pin.PULL_DOWN)  # Decrease control's value
+# Pass RP2 touch config args
+display = Display(ssd, nxt, sel, prev, increase, decrease, False, (7,))
+```
+The final two `Display` constructor args are:
+ * `encoder=False` No encoder being used in this example.
+ * `touch=(7,)` Call touch interface `config` with args 7 (up to 3 args may be
+ passed).
+
+ This arg sets the touch sensitivity. A higher value reduces sensitivity with
+ less likelihood of false positives. Further docs on `rp2_touch.py` (including
+ details of `config` args) may be found
+[here](https://github.com/peterhinch/micropython-async/blob/master/v3/docs/DRIVERS.md#424-rp2touch-classs).
 
 ###### [Contents](./README.md#0-contents)
 
