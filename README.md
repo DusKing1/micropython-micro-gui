@@ -11,7 +11,7 @@ MicroPython firmware build. Options for data input comprise:
  * Two pushbuttons and a rotary encoder such as
  [this one](https://www.adafruit.com/product/377). An intuitive interface.
  * A rotary encoder with built-in push switch only.
- * On ESP32 physical buttons may be replaced with touchpads.
+ * On ESP32 and RP2 physical buttons may be replaced with touchpads.
  * Alternative interfaces (speech, gestures) may be added via a user supplied
  driver.
 
@@ -31,6 +31,9 @@ Raspberry Pico with an ILI9341 from eBay.
 ![Image](./images/ttgo.JPG)  
 TTGO T-Display. A joystick switch and an SIL resistor make a simple inexpensive
 and WiFi-capable system.
+
+![Image](./images/rp2_touchpad.jpg)  
+ESP32 and RP2 can use touchpads in place of physical buttons.
 
 ![Image](./images/epaper.JPG)  
 micro_gui now has limited support for ePaper.
@@ -643,6 +646,7 @@ files in `gui/core` are:
 The `gui/primitives` directory contains the following files. Necessary files:  
  * `pushbutton.py` Interface to physical pushbuttons and ESP32 touch pads.
  * `delay_ms.py` A software triggerable timer.
+
  Optional files for alternative input devices:
  * `encoder.py` Driver for a quadrature encoder. This offers an alternative
  interface - see [Appendix 1](./README.md#appendix-1-application-design).
@@ -3223,6 +3227,11 @@ instances must be chosen from ones supporting the `TouchPad` class - see
 [official docs](http://docs.micropython.org/en/latest/esp32/quickref.html#capacitive-touch).
 The `Pin` constructor may be called with a single arg being the pin number.
 
+The file `gui/primitives/esp32_touch.py` is required. The primitives may be
+installed with
+```bash
+$ mpremote mip install "github:peterhinch/micropython-micro-gui/gui/primitives"
+```
 The following illustrates the end of a setup file for an application with five
 touchpads:
 ```python
@@ -3384,11 +3393,18 @@ unsuitable for `micro_gui`.
 # 11. RP2 touch pads
 
 On RP2040 physical buttons may be replaced with touch pads. Buttons and pads
-cannot be mixed, but it is possible to use three pads with an encoder.
+cannot be mixed, but it is possible to use three pads with an encoder. Touch is
+detected by capacitance, consequently the pads may be covered with an insulating
+film - for example touch can be detected on the reverse side of a PCB.
 
+The file `gui/primitives/rp2_touch.py` is required. The primitives may be
+installed with
+```bash
+$ mpremote mip install "github:peterhinch/micropython-micro-gui/gui/primitives"
+```
 The only change required to use touch pads is in `hardware_setup.py`. Any pins
 may be used; each `Pin` mst be defined as an input with a pull down. The
-following illustrates a setup file for an application with five touchpads:
+following illustrates a setup file for use with five touchpads:
 ```python
 from machine import Pin, SPI, freq
 import gc
@@ -3419,13 +3435,16 @@ display = Display(ssd, nxt, sel, prev, increase, decrease, False, (7,))
 ```
 The final two `Display` constructor args are:
  * `encoder=False` No encoder being used in this example.
- * `touch=(7,)` Call touch interface `config` with args 7 (up to 3 args may be
- passed).
+ * `touch=(7,)` Call touch interface `config` with arg 7 (up to 3 args may be
+ passed). Passing a tuple invokes the RP2 touch mechanism.
 
  This arg sets the touch sensitivity. A higher value reduces sensitivity with
  less likelihood of false positives. Further docs on `rp2_touch.py` (including
  details of `config` args) may be found
 [here](https://github.com/peterhinch/micropython-async/blob/master/v3/docs/DRIVERS.md#424-rp2touch-classs).
+Note that owing to a problem with early silicon RP2350 support requires chip
+stepping level >= A3. The stepping level is indicated by the last two characters
+of the chip ID on the package surface.
 
 ###### [Contents](./README.md#0-contents)
 
