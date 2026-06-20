@@ -5,7 +5,7 @@
     ["gui/primitives/encoder.py", "github:peterhinch/micropython-micro-gui/gui/primitives/encoder.py"],
     ["gui/primitives/pushbutton.py", "github:peterhinch/micropython-micro-gui/gui/primitives/pushbutton.py"],
     ["gui/primitives/esp32_touch.py", "github:peterhinch/micropython-micro-gui/gui/primitives/esp32_touch.py"],
-    ["gui/primitives/rp2_touch.py", "github:peterhinch/micropython-micro-gui/gui/primitives/rp2_touch.py"],
+    ["gui/primitives/rp2_touch.py", "github:peterhinch/micropython-micro-gui/gui/primitives/rp2_touch.py"]
   ],
   "version": "0.1"
 }
